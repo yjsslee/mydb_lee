@@ -188,15 +188,18 @@ def index_metric(api_id, label):
 
 if page == "홈":
     a,b,c = st.columns(3)
-    e1 = index_metric("kospi_dd_trd","코스피")
-    e2 = index_metric("kosdaq_dd_trd","코스닥")
-    try:
-        q = get_quote("005930")
-        c.metric("삼성전자 · 키움 모의 API",f"{q['price']:,.0f}원",f"{q['pct']:+.2f}%" if q["pct"] is not None else "키움 현재가")
-        e3 = None
-    except Exception as e:
-        c.metric("삼성전자 · 키움 모의 API","조회 실패")
-        e3 = str(e)
+    with a:
+        e1 = index_metric("kospi_dd_trd","코스피")
+    with b:
+        e2 = index_metric("kosdaq_dd_trd","코스닥")
+    with c:
+        try:
+            q = get_quote("005930")
+            st.metric("삼성전자 · 키움 모의 API",f"{q['price']:,.0f}원",f"{q['pct']:+.2f}%" if q["pct"] is not None else "키움 현재가")
+            e3 = None
+        except Exception as e:
+            st.metric("삼성전자 · 키움 모의 API","조회 실패")
+            e3 = str(e)
     for title, err in [("코스피",e1),("코스닥",e2),("삼성전자",e3)]:
         if err:
             with st.expander(f"{title} API 오류",expanded=(title=="삼성전자")): st.error(err)
