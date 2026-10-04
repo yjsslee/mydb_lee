@@ -122,14 +122,10 @@ def get_krx_index(api_id, label):
     # 일별 데이터라 주말/공휴일을 고려해 최근 15일을 탐색합니다.
     for offset in range(15):
         d = date.today() - timedelta(days=offset)
-        r = requests.post(
+        r = requests.get(
             url,
-            json={"basDd": d.strftime("%Y%m%d")},
-            headers={
-                "AUTH_KEY": KRX_KEY,
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
+            params={"basDd": d.strftime("%Y%m%d")},
+            headers={"AUTH_KEY": KRX_KEY, "Accept": "application/json"},
             timeout=20,
         )
         if r.status_code in (401,403):
@@ -168,7 +164,12 @@ def get_krx_index(api_id, label):
         if value is not None:
             return {"value":value,"date":match.get("BAS_DD",d.strftime("%Y%m%d"))}
         notes.append("종가 필드 없음. 응답 필드=" + ", ".join(match.keys()))
-    raise RuntimeError("KRX 데이터를 찾지 못했습니다. 마지막 응답: " + (notes[-1] if notes else "최근 15일 자료 없음") + ". KRX 사이트에서 지수 API 활용 승인을 확인하세요.")
+    last = notes[-1] if notes else "최근 15일 자료 없음"
+    raise RuntimeError(
+        "KRX 서버 연결과 인증은 되었지만 지수 데이터가 비어 있습니다. "
+        + "마지막 응답: " + last
+        + ". 이 경우 코드 오류보다 KOSPI/KOSDAQ 지수 API의 개별 활용신청·승인 상태를 먼저 확인해야 합니다."
+    )
 
 @st.cache_data
 def demo_prices():
