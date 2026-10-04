@@ -119,13 +119,14 @@ def get_krx_index(api_id, label):
     if not KRX_KEY: raise RuntimeError("KRX_API_KEY가 Secrets에 없습니다.")
     url = f"https://data-dbg.krx.co.kr/svc/apis/idx/{api_id}"
     notes = []
-    # 일별 데이터라 주말/공휴일을 고려해 최근 15일을 탐색합니다.
-    for offset in range(15):
+    # KRX 일별 데이터는 당일 장중 값이 아니므로 최근 영업일을 찾습니다.
+    # 승인 여부와 별개로 최신 데이터가 비어 있는 상황을 진단하기 위해 45일까지 확인합니다.
+    for offset in range(45):
         d = date.today() - timedelta(days=offset)
         r = requests.get(
             url,
             params={"basDd": d.strftime("%Y%m%d")},
-            headers={"AUTH_KEY": KRX_KEY, "Accept": "application/json"},
+            headers={"AUTH_KEY": KRX_KEY},
             timeout=20,
         )
         if r.status_code in (401,403):
@@ -164,11 +165,26 @@ def get_krx_index(api_id, label):
         if value is not None:
             return {"value":value,"date":match.get("BAS_DD",d.strftime("%Y%m%d"))}
         notes.append("종가 필드 없음. 응답 필드=" + ", ".join(match.keys()))
-    last = notes[-1] if notes else "최근 15일 자료 없음"
+    # 최근 자료가 전부 비어 있으면 명세서와 같은 방식으로 과거 영업일을 한 번 더 검사합니다.
+    test_date = "20260102"
+    try:
+        test = requests.get(url, params={"basDd": test_date}, headers={"AUTH_KEY": KRX_KEY}, timeout=20)
+        test_payload = test.json() if test.ok else {}
+        test_rows = test_payload.get("OutBlock_1", []) if isinstance(test_payload, dict) else []
+        if test_rows:
+            raise RuntimeError(
+                "KRX 인증과 API 권한은 정상입니다. 2026-01-02 과거 데이터는 조회되지만 최근 데이터가 비어 있습니다. "
+                "KRX 최신 데이터 제공 시점을 확인하세요."
+            )
+    except RuntimeError:
+        raise
+    except Exception:
+        pass
+    last = notes[-1] if notes else "최근 자료 없음"
     raise RuntimeError(
-        "KRX 서버 연결과 인증은 되었지만 지수 데이터가 비어 있습니다. "
-        + "마지막 응답: " + last
-        + ". 이 경우 코드 오류보다 KOSPI/KOSDAQ 지수 API의 개별 활용신청·승인 상태를 먼저 확인해야 합니다."
+        "KRX 승인 화면은 정상이어도 Streamlit에 저장된 인증키가 현재 승인된 인증키와 다르면 조회가 되지 않을 수 있습니다. "
+        + "최근 45일과 2026-01-02 테스트 모두 데이터가 비었습니다. 마지막 응답: " + last
+        + ". Streamlit Settings → Secrets의 KRX_API_KEY를 KRX 마이페이지의 현재 발급 인증키로 다시 저장한 뒤 앱을 재부팅하세요."
     )
 
 @st.cache_data
