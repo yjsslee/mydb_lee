@@ -122,8 +122,16 @@ def get_krx_index(api_id, label):
     # 일별 데이터라 주말/공휴일을 고려해 최근 15일을 탐색합니다.
     for offset in range(15):
         d = date.today() - timedelta(days=offset)
-        r = requests.get(url, params={"basDd":d.strftime("%Y%m%d")},
-                         headers={"AUTH_KEY":KRX_KEY,"Accept":"application/json"}, timeout=20)
+        r = requests.post(
+            url,
+            json={"basDd": d.strftime("%Y%m%d")},
+            headers={
+                "AUTH_KEY": KRX_KEY,
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            timeout=20,
+        )
         if r.status_code in (401,403):
             raise RuntimeError(f"KRX 인증 거부(HTTP {r.status_code}). 인증키 발급 및 해당 API 활용 신청/승인을 확인하세요.")
         if not r.ok:
@@ -139,11 +147,16 @@ def get_krx_index(api_id, label):
                 if isinstance(payload.get(key),list):
                     rows = payload[key]
                     break
-            if not rows:
+            if rows is None:
                 msg = payload.get("respMsg") or payload.get("return_msg") or payload.get("message")
                 code = payload.get("respCode") or payload.get("return_code") or payload.get("code")
-                if msg or code: notes.append(f"응답코드={code}, 메시지={msg}")
-                else: notes.append("응답 필드=" + ", ".join(payload.keys()))
+                if msg or code:
+                    notes.append(f"응답코드={code}, 메시지={msg}")
+                else:
+                    notes.append("응답 구조를 인식하지 못함. 응답 필드=" + ", ".join(payload.keys()))
+                continue
+            if len(rows) == 0:
+                notes.append(f"{d:%Y-%m-%d}: 정상 응답이지만 데이터 없음")
                 continue
         if not rows: continue
         # KRX 지수 API는 IDX_NM, CLSPRC_IDX, BAS_DD 필드를 제공합니다.
