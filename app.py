@@ -49,7 +49,7 @@ def clean_number(value):
     if not text or text in ("-", "None", "null"):
         return None
     try:
-        return abs(float(text))
+        return float(text)
     except (TypeError, ValueError):
         return None
 
@@ -91,7 +91,7 @@ def get_kiwoom_quote(app_key, app_secret, stock_code):
     if price is None:
         raise RuntimeError(data.get("return_msg") or "현재가(cur_prc)를 응답에서 찾지 못했습니다.")
     return {
-        "price": price,
+        "price": abs(price),
         "change": clean_number(data.get("pred_pre")),
         "change_pct": clean_number(data.get("flu_rt")),
         "name": data.get("stk_nm", stock_code),
